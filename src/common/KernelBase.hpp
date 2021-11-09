@@ -15,6 +15,9 @@
 #include "common/RunParams.hpp"
 
 #include "RAJA/util/Timer.hpp"
+#if defined(RAJA_USE_PAPI)
+#include "RAJA/util/PerfEvents.hpp"
+#endif
 #if defined(RAJA_ENABLE_CUDA)
 #include "RAJA/policy/cuda/raja_cudaerrchk.hpp"
 #endif
@@ -93,6 +96,20 @@ public:
   double getMinTime(VariantID vid) const { return min_time[vid]; }
   double getMaxTime(VariantID vid) const { return max_time[vid]; }
   double getTotTime(VariantID vid) { return tot_time[vid]; }
+#if defined(RAJA_USE_PAPI)
+  std::vector<std::string> getPerfEventNames(VariantID vid) const
+  {
+    std::vector<std::string> eventNames;
+    for (auto e : eventsList[vid])
+      eventNames.push_back(e.first);
+    return eventNames;
+  }
+  double getTotPerfEvent(VariantID vid, const char* eventName) const
+  {
+    auto events = eventsList[vid];
+    return (double)(events[eventName][2]);
+  }
+#endif
   Checksum_type getChecksum(VariantID vid) const { return checksum[vid]; }
 
   void execute(VariantID vid);
@@ -119,15 +136,38 @@ public:
   {
     synchronize();
     timer.start();
+#if defined(RAJA_USE_PAPI)
+    perfEvents.start();
+#endif
+  }
+
+  void pauseTimer() 
+  { 
+    synchronize();
+    timer.pause(); 
+#if defined(RAJA_USE_PAPI)
+    perfEvents.pause();
+#endif
   }
 
   void stopTimer()
   {
     synchronize();
+#if defined(RAJA_USE_PAPI)
+    perfEvents.stop();
+#endif
     timer.stop(); recordExecTime();
+#if defined(RAJA_USE_PAPI)
+    recordPerfEvents();
+#endif
   }
 
-  void resetTimer() { timer.reset(); }
+  void resetTimer() {
+    timer.reset();
+#if defined(RAJA_USE_PAPI)
+    perfEvents.reset();
+#endif
+  }
 
   //
   // Virtual and pure virtual methods that may/must be implemented
@@ -162,10 +202,17 @@ protected:
   Checksum_type checksum[NumVariants];
   Checksum_type checksum_scale_factor;
 
+#if defined(RAJA_USE_PAPI)
+  std::map<std::string,std::vector<long_long> > eventsList[NumVariants];
+#endif
+
 private:
   KernelBase() = delete;
 
   void recordExecTime();
+#if defined(RAJA_USE_PAPI)
+  void recordPerfEvents();
+#endif
 
   //
   // Static properties of kernel, independent of run
@@ -195,6 +242,9 @@ private:
   int num_exec[NumVariants];
 
   RAJA::Timer timer;
+#if defined(RAJA_USE_PAPI)
+  RAJA::PerfEvents perfEvents;
+#endif
 
   RAJA::Timer::ElapsedType min_time[NumVariants];
   RAJA::Timer::ElapsedType max_time[NumVariants];

@@ -49,6 +49,9 @@ private:
   enum CSVRepMode {
     Timing = 0,
     Speedup,
+#if defined(RAJA_USE_PAPI)
+    PerfEvents,
+#endif
 
     NumRepModes // Keep this one last and DO NOT remove (!!)
   };
@@ -66,7 +69,11 @@ private:
                       size_t prec);
   std::string getReportTitle(CSVRepMode mode);
   long double getReportDataEntry(CSVRepMode mode,
-                                 KernelBase* kern, VariantID vid);
+                                 KernelBase* kern, VariantID vid
+#if defined(RAJA_USE_PAPI)
+                                 , const char* entryName=NULL
+#endif
+                                );
 
   void writeChecksumReport(const std::string& filename);
 

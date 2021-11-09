@@ -114,6 +114,37 @@ void KernelBase::recordExecTime()
   tot_time[running_variant] += exec_time;
 }
 
+#if defined(RAJA_USE_PAPI)
+void KernelBase::recordPerfEvents()
+{
+  auto events = perfEvents.getEvents();
+  for ( auto it = events.begin(); it != events.end(); it++ )
+  {
+    std::string name = it->first;
+    long_long val = it->second;
+    if (eventsList[running_variant].find(name) == eventsList[running_variant].end())
+    {
+      eventsList[running_variant][name] = { val, val, val };
+    }
+    else
+    {
+      eventsList[running_variant][name] = {
+        std::min(eventsList[running_variant][name][0], val),
+        std::max(eventsList[running_variant][name][1], val),
+        eventsList[running_variant][name][2] + val };
+    }
+  }
+#if 0
+  std::cout << "running_variant = " << running_variant << std::endl;
+  for (auto e : eventsList[running_variant])
+  {
+    std::cout << e.first << " min: " << e.second[0] << " max: " << e.second[1]
+      << " tot: " << e.second[2] << std::endl;
+  }
+#endif
+}
+#endif
+
 void KernelBase::runKernel(VariantID vid)
 {
   if ( !has_variant_defined[vid] ) {

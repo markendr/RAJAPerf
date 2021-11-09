@@ -613,6 +613,11 @@ void Executor::outputRunData()
   string filename = out_fprefix + "-timing.csv";
   writeCSVReport(filename, CSVRepMode::Timing, 6 /* prec */);
 
+#if defined(RAJA_USE_PAPI)
+  filename = out_fprefix + "-papi.csv";
+  writeCSVReport(filename, CSVRepMode::PerfEvents, 6 /* prec */);
+#endif
+
   if ( haveReferenceVariant() ) {
     filename = out_fprefix + "-speedup.csv";
     writeCSVReport(filename, CSVRepMode::Speedup, 3 /* prec */);
@@ -664,6 +669,13 @@ void Executor::writeCSVReport(const string& filename, CSVRepMode mode,
       varcol_width[iv] = max(prec+2, getVariantName(variant_ids[iv]).size());
     }
 
+#if defined(RAJA_USE_PAPI)
+    // Expect all kernels/variants to capture the same list of events.
+    std::vector<std::string> eventNames;
+    if (mode == CSVRepMode::PerfEvents)
+      eventNames = kernels[0]->getPerfEventNames(variant_ids[0]);
+#endif
+
     //
     // Print title line.
     //
@@ -675,6 +687,11 @@ void Executor::writeCSVReport(const string& filename, CSVRepMode mode,
 
     for (size_t iv = 0; iv < variant_ids.size(); ++iv) {
       file << sepchr;
+#if defined(RAJA_USE_PAPI)
+      if (mode == CSVRepMode::PerfEvents)
+        for (auto n : eventNames)
+          file << sepchr;
+#endif
     }
     file << endl;
 
@@ -685,6 +702,11 @@ void Executor::writeCSVReport(const string& filename, CSVRepMode mode,
     for (size_t iv = 0; iv < variant_ids.size(); ++iv) {
       file << sepchr <<left<< setw(varcol_width[iv])
            << getVariantName(variant_ids[iv]);
+#if defined(RAJA_USE_PAPI)
+      if (mode == CSVRepMode::PerfEvents)
+        for (auto n : eventNames)
+          file << sepchr << n;
+#endif
     }
     file << endl;
 
@@ -705,8 +727,19 @@ void Executor::writeCSVReport(const string& filename, CSVRepMode mode,
                     !kern->hasVariantDefined(vid) ) {
           file << "Not run";
         } else {
-          file << setprecision(prec) << std::fixed
-               << getReportDataEntry(mode, kern, vid);
+#if defined(RAJA_USE_PAPI)
+          if (mode == CSVRepMode::PerfEvents) {
+            file << setprecision(prec) << std::fixed
+                 << getReportDataEntry(CSVRepMode::Timing, kern, vid);
+            for (auto n : eventNames)
+              file << sepchr << std::scientific << getReportDataEntry(mode, kern, vid, n.c_str());
+          } else {
+#endif
+            file << setprecision(prec) << std::fixed
+                 << getReportDataEntry(mode, kern, vid);
+#if defined(RAJA_USE_PAPI)
+          }
+#endif
         }
       }
       file << endl;
@@ -1066,6 +1099,12 @@ string Executor::getReportTitle(CSVRepMode mode)
       }
       break;
     }
+#if defined(RAJA_USE_PAPI)
+    case CSVRepMode::PerfEvents : { 
+      title = string("PAPI Events Report "); 
+      break; 
+    }
+#endif
     default : { cout << "\n Unknown CSV report mode = " << mode << endl; }
   };
   return title;
@@ -1073,7 +1112,11 @@ string Executor::getReportTitle(CSVRepMode mode)
 
 long double Executor::getReportDataEntry(CSVRepMode mode,
                                          KernelBase* kern,
-                                         VariantID vid)
+                                         VariantID vid
+#if defined(RAJA_USE_PAPI)
+                                         , const char* entryName
+#endif
+                                         )
 {
   long double retval = 0.0;
   switch ( mode ) {
@@ -1099,6 +1142,12 @@ long double Executor::getReportDataEntry(CSVRepMode mode,
       }
       break;
     }
+#if defined(RAJA_USE_PAPI)
+    case CSVRepMode::PerfEvents : {
+      retval = kern->getTotPerfEvent(vid, entryName) / run_params.getNumPasses();
+      break; 
+    }
+#endif
     default : { cout << "\n Unknown CSV report mode = " << mode << endl; }
   };
   return retval;
