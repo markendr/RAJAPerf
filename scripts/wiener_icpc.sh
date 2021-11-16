@@ -25,8 +25,8 @@ module load cmake
 
 cmake \
   -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_CXX_COMPILER=/opt/ohpc/pub/compiler/Intel/2021.04.0.3422/compiler/2021.4.0/linux/bin/icpx \
-  -DCMAKE_C_COMPILER=/opt/ohpc/pub/compiler/Intel/2021.04.0.3422/compiler/2021.4.0/linux/bin/icx \
+  -DCMAKE_CXX_COMPILER=icpx \
+  -DCMAKE_C_COMPILER=icx \
   -DRAJA_USE_PAPI=On \
   -DBLT_CXX_STD=c++11 \
   -C ${RAJA_HOSTCONFIG} \
